@@ -174,7 +174,7 @@ module Make (C : Context) = struct
   type sat =
     | Unsat of Z3.Expr.expr Lazy.t (** Proof *)
     | Sat of Z3.Model.model Lazy.t (** Model *)
-    | Unkown of string (** Reason *)
+    | Unknown of string (** Reason *)
 
   (** {2 Solver calls} *)
   module Solver = struct
@@ -184,13 +184,22 @@ module Make (C : Context) = struct
 
     let add ~solver x =
       Z3.Solver.add solver [x]
+      
+    let add_with_label ~solver (x, str_lbl) =
+      let lbl = Symbol.declare Bool str_lbl in
+      Z3.Solver.assert_and_track solver x (T.(!lbl))
 
     let check ~solver l =
       let open Z3.Solver in
       match check solver (l) with
         | UNSATISFIABLE -> Unsat (lazy (opt_get @@ get_proof solver))
-        | UNKNOWN -> Unkown (get_reason_unknown solver)
+        | UNKNOWN -> Unknown (get_reason_unknown solver)
         | SATISFIABLE -> Sat (lazy (opt_get @@ get_model solver))
+        
+    let get_unsat_core ~solver =
+      let open Z3.Solver in
+      let unsat_core = get_unsat_core solver in
+      String.concat " " (List.map Z3.AST.to_string unsat_core)
 
   end
 

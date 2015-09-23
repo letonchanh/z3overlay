@@ -1,5 +1,5 @@
 (** We hide the context by instanciating a functor: *)
-module Z = ZZ3.Make (struct let ctx = Z3.mk_context [] end)
+module Z = ZZ3.Make (struct let ctx = Z3.mk_context [("unsat_core", "true")] end)
 
 
 (** The result of the functor is safe for opening (contains only types and modules. *)
@@ -14,20 +14,23 @@ let () =
   (** We create new SMT variables and specify their types. *)
   let x = Symbol.declare Real "x" in
   let y = Symbol.declare Real "y" in
+  let z = Symbol.declare Int "z" in
 
   (** We can define SMT formulas using an OCaml-like syntax.
       [!] transforms a symbol into a term.
   *)
-  let t = T.( !y <= int 3 && !x + !y <= rat Q.(5 // 2)) in
+  let t = T.(!y <= int 3 && !x + !y <= rat Q.(5 // 2)) in
 
   (** We assert the formula in the SMT solver. *)
-  Solver.add ~solver t ;
+  Solver.add ~solver t;
+  Solver.add_with_label ~solver (T.(!z <= int 0 && !z > int 0), "assert_z");
 
   (** We can now solve it and extract the result: *)
   let result = Solver.check ~solver [] in
 
   let model = match result with
-    | Unsat _ | Unkown _ -> failwith "Oh noees"
+    | Unsat _ -> failwith ("UNSAT: " ^ (Solver.get_unsat_core ~solver))
+    | Unknown _ -> failwith "UNKNOWN"
     | Sat (lazy model) -> model
   in
 
